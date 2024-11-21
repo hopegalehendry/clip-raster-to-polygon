@@ -1,0 +1,87 @@
+---
+title: "horsefly tiff production"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# This code is for the purpose of clipping multiple raster files to a single polygon.
+# Input: Polygon and raster files
+# Output: .tif of clippes raster
+
+### Workflow ###
+# 1. load libraries
+# 2. establish files and file paths
+# 3. Load polygon of interest
+# 4. Check CRS of polygon and rasters
+# 4b.Make sure they match with the 'project' fxn
+# 5. Prepare for 'for' loop by setting range variable and defining file variable with catenation
+# 6. Loop!
+# - for each file in years, if the file exists, load it, crop it, mask it, save it, 
+################
+
+### Load Libraries ###
+
+library(terra)
+
+### SET FILE PATHS ### 
+
+polygon <- ("/Users/hopewolfchild/Desktop/Python Project/Horsefly_polygon/Horesefly_polygon.shp")
+land_cover <- ("/Users/hopewolfchild/Desktop/Data/Land Cover/NLCD 1985-2023/")
+output_folder <- ("/Users/hopewolfchild/Desktop/Python Project/tiffs")
+
+### LOAD POLYGON OF INTEREST ###
+
+hf_polygon <- vect(polygon)
+
+### CHECK COORDINATE REF SYSTEM TO MAKE SURE THEY WILL OVERLAP RIGHT ### 
+print(crs(hf_polygon))
+sample_raster <- (crs(rast(paste0(land_cover, "NLCD_2020.tif"))))
+print(sample_raster)
+
+### IF NEEDED REPROJECT POLYGON TO MATCH RASTER CRS ###
+
+hf_polygon <- project(hf_polygon, crs(sample_raster))
+
+### NOW PREPARE FOR A FOR LOOP ###
+### Create range of years and define files ###
+
+years <- 1985:2023
+nlcd_files <- paste0(land_cover, "NLCD_", years, ".tif")
+
+### LOOP ###
+
+### Loop through each year, load the corresponding raster, crop it to the polygon, and save it.
+
+# for each year in the years sequence
+for (i in seq_along(years)) {
+  
+  # the file we will use refers to the nlcd files, we will call it raster_file
+  raster_file <- nlcd_files[i]
+  
+  # if the files exists
+  if (file.exists(raster_file)) {
+    # load the file
+    nlcd_raster <- rast(raster_file)
+    
+    # crop the file to the extent of the polygon
+    cropped_raster <- crop(nlcd_raster, hf_polygon)  
+    
+    # mask the na pixels around it
+    masked_raster <- mask(cropped_raster, hf_polygon)
+    
+    # Define output file name
+    output_file <- paste0(output_folder, "NLCD_", years[i], "_cropped_hf.tif")
+    
+    # Save the output raster - datatype is important here! overwrite just means if it already exists itll replace it
+    writeRaster(masked_raster, output_file, datatype = "INT1U", overwrite = TRUE)
+    
+    # Print progress
+    cat("Processed and saved:", output_file, "\n")
+  } else {
+    # If the file does not exist, print a warning
+    cat("File not found:", raster_file, "\n")
+  }
+}
+```
